@@ -1,2 +1,5 @@
-streamlit>=1.32.0
-pandas>=2.0.0
+streamlit
+pandas
+sqlalchemy
+psycopg2-binary
+python-dotenv
