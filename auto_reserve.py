@@ -17,7 +17,7 @@ def main():
         purpose="定期ジョブ",
         start_dt=start_dt,
         end_dt=end_dt,
-        memory_gb=0.0,
+        memory_gb=1.0,
     )
 
     print(f"[auto_reserve] {start_dt} - {end_dt} を予約しました。")
