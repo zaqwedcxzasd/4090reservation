@@ -1,0 +1,39 @@
+# .github/workflows/auto-reserve.yml
+name: Auto reserve GPU
+
+on:
+  schedule:
+    # 3日おきに 00:00 (UTC) に実行
+    # JST だと 09:00 前後になります
+    - cron: "0 0 */3 * *"
+
+  # 手動実行できると便利なのでおまけ
+  workflow_dispatch:
+
+jobs:
+  run-auto-reserve:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run auto_reserve.py
+        env:
+          # Supabase Session Pooler の情報を secrets から渡す
+          user: ${{ secrets.DB_USER }}
+          password: ${{ secrets.DB_PASSWORD }}
+          host: ${{ secrets.DB_HOST }}
+          port: ${{ secrets.DB_PORT }}
+          dbname: ${{ secrets.DB_NAME }}
+        run: |
+          python auto_reserve.py
