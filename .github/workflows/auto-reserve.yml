@@ -5,7 +5,7 @@ on:
   schedule:
     # 3日おきに 00:00 (UTC) に実行
     # JST だと 09:00 前後になります
-    - cron: "0 0 */3 * *"
+    - cron: "* * * * *"
 
   # 手動実行できると便利なのでおまけ
   workflow_dispatch:
