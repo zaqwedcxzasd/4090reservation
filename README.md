@@ -4,9 +4,6 @@
 **Streamlit を使った GPU 予約管理アプリ** と
 **GitHub Actions による自動予約スクリプト（auto_reserve.py）** をまとめたプロジェクトです。
 
-アプリは **PostgreSQL（Supabase）** をバックエンド DB として利用し、
-Web UI と自動バッチ処理のどちらからも予約データを扱える構成になっています。
-
 ---
 
 ## 📌 概要
