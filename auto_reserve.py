@@ -8,9 +8,9 @@ def main():
 
     today = datetime.now(TZ).date()
 
-    # 例: 今日の 09:00〜18:00 を 8GB で予約
-    start_dt = datetime.combine(today, time(9, 0), tzinfo=TZ)
-    end_dt = datetime.combine(today, time(18, 0), tzinfo=TZ)
+    # 例: 今日の 00:00〜00:01 を 8GB で予約
+    start_dt = datetime.combine(today, time(0, 0), tzinfo=TZ)
+    end_dt = datetime.combine(today, time(0, 1), tzinfo=TZ)
 
     add_reservation(
         name="自動予約ユーザ",
