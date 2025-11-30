@@ -1,5 +1,6 @@
 from datetime import datetime, date, time, timedelta
 from zoneinfo import ZoneInfo  # 型ヒント等で使うなら残してOK
+import os
 
 import pandas as pd
 import streamlit as st
