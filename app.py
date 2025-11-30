@@ -1,12 +1,12 @@
 from datetime import datetime, date, time, timedelta
-from zoneinfo import ZoneInfo
-import os
+from zoneinfo import ZoneInfo  # 型ヒント等で使うなら残してOK
 
 import pandas as pd
 import streamlit as st
-from sqlalchemy import create_engine, text
-from sqlalchemy.pool import NullPool
-from dotenv import load_dotenv
+
+# DB関連は db_core からインポート
+from db_core import TZ, init_db, add_reservation, delete_reservation, fetch_reservations
+# ↑ TZ も db_core 側のものを使う
 
 
 # ---------------- 認証 ---------------- #
@@ -31,123 +31,6 @@ def check_password() -> bool:
     if st.session_state.get("password_ok") is False:
         st.error("パスワードが違います。")
     return False
-
-
-# ---------------- 設定 ---------------- #
-
-TZ = ZoneInfo("Asia/Tokyo")
-
-# ---------- DB 接続設定（Supabase Session Pooler / SQLAlchemy） ----------
-
-# .env の読み込み
-# .env には Supabase の「Connect → ORMs → SQLAlchemy → Method: Session pooler」で
-# 表示されている値をそのまま書いてください。
-#
-# 例:
-# user=postgres.pvemwsmtudnxgcvzphoo
-# password=あなたのDBパスワード
-# host=aws-1-ap-south-1.pooler.supabase.com
-# port=5432
-# dbname=postgres
-load_dotenv()
-
-USER = os.getenv("user")
-PASSWORD = os.getenv("password")
-HOST = os.getenv("host")
-PORT = os.getenv("port", "5432")
-DBNAME = os.getenv("dbname", "postgres")
-
-if not all([USER, PASSWORD, HOST, PORT, DBNAME]):
-    raise RuntimeError("DB接続情報(.env の user/password/host/port/dbname)が不足しています。")
-
-# Supabase が例示している SQLAlchemy 用の形式
-DATABASE_URL = (
-    f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}?sslmode=require"
-)
-
-# Session Pooler を使うので、SQLAlchemy 側のプーリングは NullPool にしておく
-engine = create_engine(DATABASE_URL, poolclass=NullPool)
-
-
-# ---------------- DB helpers（PostgreSQL版） ---------------- #
-
-def init_db():
-    """PostgreSQL 上にテーブルがなければ作成"""
-    create_table_sql = """
-    CREATE TABLE IF NOT EXISTS reservations (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        purpose TEXT NOT NULL,
-        start_dt TIMESTAMPTZ NOT NULL,
-        end_dt TIMESTAMPTZ NOT NULL,
-        memory_gb DOUBLE PRECISION NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL
-    );
-    """
-    with engine.begin() as conn:
-        conn.execute(text(create_table_sql))
-
-
-def add_reservation(name: str, purpose: str, start_dt: datetime, end_dt: datetime, memory_gb: float):
-    sql = """
-    INSERT INTO reservations (name, purpose, start_dt, end_dt, memory_gb, created_at)
-    VALUES (:name, :purpose, :start_dt, :end_dt, :memory_gb, :created_at)
-    """
-    with engine.begin() as conn:
-        conn.execute(
-            text(sql),
-            {
-                "name": name,
-                "purpose": purpose,
-                "start_dt": start_dt.astimezone(TZ),
-                "end_dt": end_dt.astimezone(TZ),
-                "memory_gb": float(memory_gb),
-                "created_at": datetime.now(tz=TZ),
-            },
-        )
-
-
-def delete_reservation(res_id: int):
-    sql = "DELETE FROM reservations WHERE id = :id"
-    with engine.begin() as conn:
-        conn.execute(text(sql), {"id": res_id})
-
-
-def fetch_reservations(
-    start_range: datetime | None = None,
-    end_range: datetime | None = None,
-) -> pd.DataFrame:
-    """
-    指定期間にかぶる予約をPostgreSQLから取得。
-    start_range/end_range は tz-aware datetime を期待。
-    """
-    base_sql = "SELECT * FROM reservations"
-    conditions = []
-    params: dict[str, object] = {}
-
-    if start_range is not None:
-        conditions.append("end_dt > :start_range")
-        params["start_range"] = start_range.astimezone(TZ)
-    if end_range is not None:
-        conditions.append("start_dt < :end_range")
-        params["end_range"] = end_range.astimezone(TZ)
-
-    if conditions:
-        base_sql += " WHERE " + " AND ".join(conditions)
-
-    base_sql += " ORDER BY start_dt, end_dt"
-
-    with engine.connect() as conn:
-        df = pd.read_sql(text(base_sql), conn, params=params)
-
-    if df.empty:
-        return df
-
-    # 念のため Asia/Tokyo に揃える（すでに tz-aware のはずだが保険）
-    for col in ["start_dt", "end_dt", "created_at"]:
-        df[col] = pd.to_datetime(df[col]).dt.tz_convert(TZ)
-
-    return df
 
 
 # ----------------- Logic helpers ----------------- #
@@ -185,9 +68,9 @@ def total_memory_per_bin(res_df: pd.DataFrame, bins: list[tuple[datetime, dateti
         totals.append(
             {
                 "time_range": f"{b_start.strftime('%H:%M')}–{b_end.strftime('%H:%M')}",
-                    "start": b_start,
-                    "end": b_end,
-                    "total_gb": float(total),
+                "start": b_start,
+                "end": b_end,
+                "total_gb": float(total),
             }
         )
     return pd.DataFrame(totals)
@@ -209,6 +92,7 @@ if not check_password():
 
 st.title("GPU4090予約アプリ")
 
+# DB 初期化（テーブルがなければ作成）
 init_db()
 
 with st.sidebar:
